@@ -1,0 +1,459 @@
+
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Progress Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --grad1:#a855f7; --grad2:#ec4899;
+    --ink:#2c2440; --muted:#7a6f92; --line:#eadff5;
+    --card:#ffffff; --bg:#faf6ff;
+    --down:#17b8a6; --up:#f4a259; --same:#c9bce0;
+    --downsoft:#e0f7f3; --upsoft:#fcefe0;
+    --radius:18px; --shadow:0 8px 30px rgba(120,70,190,.10);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'Nunito',system-ui,sans-serif;color:var(--ink);
+    background:linear-gradient(180deg,#faf6ff 0%,#fdf3fb 100%);
+    min-height:100vh;-webkit-text-size-adjust:100%;
+  }
+  h1,h2,h3{font-family:'Fraunces',Georgia,serif;font-weight:600;margin:0}
+  .wrap{max-width:640px;margin:0 auto;padding:0 16px 64px}
+  header.top{
+    background:linear-gradient(120deg,var(--grad1),var(--grad2));
+    color:#fff;padding:26px 20px 30px;border-radius:0 0 26px 26px;
+    box-shadow:0 10px 34px rgba(168,85,247,.28);text-align:center;
+  }
+  header.top h1{font-size:1.7rem;letter-spacing:.2px}
+  header.top p{margin:6px 0 0;opacity:.92;font-weight:600;font-size:.92rem}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px;margin-top:18px}
+  .card h2{font-size:1.15rem;margin-bottom:2px}
+  .card .sub{color:var(--muted);font-size:.85rem;margin:2px 0 12px}
+
+  /* PIN gate */
+  #gate{position:fixed;inset:0;background:linear-gradient(160deg,var(--grad1),var(--grad2));
+    display:flex;align-items:center;justify-content:center;z-index:50;padding:24px}
+  #gate .box{background:#fff;border-radius:24px;padding:30px 26px;max-width:340px;width:100%;
+    text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.22)}
+  #gate h2{font-size:1.4rem;margin-bottom:4px}
+  #gate p{color:var(--muted);font-size:.9rem;margin:6px 0 18px}
+  .pin-in{width:100%;font-size:1.5rem;text-align:center;letter-spacing:.4em;
+    padding:12px;border:2px solid var(--line);border-radius:14px;font-family:'Nunito';font-weight:800}
+  .pin-in:focus{outline:none;border-color:var(--grad1)}
+
+  button.primary{
+    background:linear-gradient(120deg,var(--grad1),var(--grad2));color:#fff;border:none;
+    font-family:'Nunito';font-weight:800;font-size:1rem;padding:13px 18px;border-radius:14px;
+    width:100%;cursor:pointer;box-shadow:0 8px 20px rgba(168,85,247,.28);margin-top:14px}
+  button.primary:active{transform:translateY(1px)}
+  button.ghost{background:#f3ecfb;color:var(--ink);border:1px solid var(--line);
+    font-family:'Nunito';font-weight:700;padding:9px 14px;border-radius:12px;cursor:pointer}
+
+  .banner{background:#fff6e6;border:1px solid #f3dca6;color:#8a6300;border-radius:14px;
+    padding:10px 14px;font-size:.85rem;font-weight:700;margin-top:16px}
+
+  /* form */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  label.f{display:flex;flex-direction:column;font-size:.78rem;font-weight:700;color:var(--muted);gap:4px}
+  label.f input{font-family:'Nunito';font-weight:700;font-size:1rem;color:var(--ink);
+    padding:10px 11px;border:1.5px solid var(--line);border-radius:11px}
+  label.f input:focus{outline:none;border-color:var(--grad1)}
+  .fieldset-title{font-weight:800;color:var(--ink);font-size:.82rem;margin:14px 0 6px;
+    text-transform:uppercase;letter-spacing:.06em}
+  details.entry summary{list-style:none;cursor:pointer;font-family:'Fraunces';font-weight:600;
+    font-size:1.15rem;display:flex;align-items:center;justify-content:space-between}
+  details.entry summary::-webkit-details-marker{display:none}
+  details.entry summary .chev{transition:transform .2s;color:var(--grad1);font-weight:800}
+  details.entry[open] summary .chev{transform:rotate(90deg)}
+
+  /* hero silhouette */
+  .hero{display:flex;gap:14px;align-items:stretch;flex-wrap:wrap}
+  .figure{flex:0 0 190px;display:flex;justify-content:center;align-items:center;
+    background:linear-gradient(180deg,#fbf7ff,#f6ecff);border-radius:16px;padding:10px;min-width:170px}
+  .figure svg{width:100%;height:auto;max-width:190px}
+  .zone{transition:fill .5s ease,opacity .4s ease;cursor:pointer}
+  .zone.down{animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.7}50%{opacity:.95}}
+  .readout{flex:1;min-width:190px;display:flex;flex-direction:column;justify-content:center;gap:8px}
+  .ritem{display:flex;justify-content:space-between;align-items:baseline;
+    padding:8px 12px;border-radius:12px;background:#faf6ff;font-size:.9rem}
+  .ritem b{font-family:'Fraunces';font-weight:600}
+  .delta{font-weight:800;font-size:.85rem}
+  .delta.down{color:var(--down)} .delta.up{color:var(--up)} .delta.same{color:var(--muted)}
+  .toggle{display:inline-flex;background:#f0e7fb;border-radius:11px;padding:3px;gap:3px;margin-top:2px}
+  .toggle button{border:none;background:none;font-family:'Nunito';font-weight:800;font-size:.8rem;
+    padding:6px 12px;border-radius:9px;cursor:pointer;color:var(--muted)}
+  .toggle button.on{background:#fff;color:var(--ink);box-shadow:0 2px 6px rgba(120,70,190,.15)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.76rem;color:var(--muted);
+    font-weight:700;margin-top:12px}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:11px;height:11px;border-radius:50%}
+
+  /* stat tiles */
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tile{background:#faf6ff;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+  .tile .lab{font-size:.72rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .tile .val{font-family:'Fraunces';font-weight:600;font-size:1.4rem;margin-top:2px}
+  .tile .chg{font-size:.78rem;font-weight:800}
+
+  canvas{margin-top:6px}
+  .empty{color:var(--muted);font-size:.9rem;text-align:center;padding:22px 8px}
+  .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:26px}
+  @media(max-width:430px){ .figure{flex:1 1 100%} }
+</style>
+</head>
+<body>
+
+<!-- PIN GATE -->
+<div id="gate">
+  <div class="box">
+    <h2>Hello lovely</h2>
+    <p>Pop your PIN in to see your progress.</p>
+    <input id="pinInput" class="pin-in" type="tel" inputmode="numeric" maxlength="8" placeholder="••••" autocomplete="off">
+    <button class="primary" id="pinBtn">Let me in</button>
+    <p id="pinErr" style="color:#d64545;display:none;margin-top:10px">That PIN didn't work, try again.</p>
+  </div>
+</div>
+
+<header class="top">
+  <h1>Your Progress</h1>
+  <p id="tagline">Small steps, week by week</p>
+</header>
+
+<div class="wrap" id="app" style="display:none">
+
+  <div id="demoBanner" class="banner" style="display:none">
+    Demo mode: showing sample data. Add your Web App URL in the file to save real entries to your sheet.
+  </div>
+
+  <!-- ADD ENTRY -->
+  <div class="card">
+    <details class="entry">
+      <summary><span>Add this week's numbers</span><span class="chev">›</span></summary>
+      <div style="margin-top:14px">
+        <div class="fieldset-title">The basics</div>
+        <div class="grid">
+          <label class="f">Date<input id="in_date" type="date"></label>
+          <label class="f">Weight (kg)<input id="in_weight" type="number" step="0.1" inputmode="decimal"></label>
+        </div>
+        <div class="fieldset-title">Measurements (cm)</div>
+        <div class="grid">
+          <label class="f">Chest<input id="in_chest" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Waist<input id="in_waist" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Hips<input id="in_hips" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Upper arm<input id="in_upperArm" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Thigh (L)<input id="in_thighL" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Thigh (R)<input id="in_thighR" type="number" step="0.1" inputmode="decimal"></label>
+        </div>
+        <div class="fieldset-title">From the scales</div>
+        <div class="grid">
+          <label class="f">Body fat (%)<input id="in_bodyFat" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Body water (%)<input id="in_bodyWater" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Bone mass (kg)<input id="in_boneMass" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Metabolic age<input id="in_metabolicAge" type="number" step="1" inputmode="numeric"></label>
+          <label class="f">BMR (kcal)<input id="in_bmr" type="number" step="1" inputmode="numeric"></label>
+          <label class="f">Calorie intake<input id="in_calories" type="number" step="1" inputmode="numeric"></label>
+        </div>
+        <button class="primary" id="saveBtn">Save this week</button>
+        <p id="saveMsg" style="text-align:center;font-weight:700;font-size:.85rem;margin:10px 0 0;display:none"></p>
+      </div>
+    </details>
+  </div>
+
+  <!-- BODY MAP -->
+  <div class="card">
+    <h2>Your shape</h2>
+    <p class="sub" id="shapeSub">How each area has changed</p>
+    <div class="hero">
+      <div class="figure" id="figWrap"></div>
+      <div class="readout" id="readout"></div>
+    </div>
+    <div style="margin-top:12px">
+      <span class="toggle" id="refToggle">
+        <button data-ref="start" class="on">Since start</button>
+        <button data-ref="last">Since last</button>
+      </span>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--down)"></span>Gone down</span>
+      <span><span class="dot" style="background:var(--up)"></span>Gone up</span>
+      <span><span class="dot" style="background:var(--same)"></span>About the same</span>
+    </div>
+  </div>
+
+  <!-- TILES -->
+  <div class="card">
+    <h2>Latest readings</h2>
+    <p class="sub">Change shown against your previous entry</p>
+    <div class="tiles" id="tiles"></div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="card">
+    <h2>Weight</h2>
+    <div id="wrapWeight"><canvas id="chartWeight" height="200"></canvas></div>
+  </div>
+  <div class="card">
+    <h2>Measurements</h2>
+    <p class="sub">All the tape-measure numbers, over time</p>
+    <div id="wrapMeas"><canvas id="chartMeas" height="220"></canvas></div>
+  </div>
+  <div class="card">
+    <h2>Body composition</h2>
+    <p class="sub">Body fat and water percentage</p>
+    <div id="wrapComp"><canvas id="chartComp" height="200"></canvas></div>
+  </div>
+
+  <p class="foot">Made with love. Every entry is a little win. 💜</p>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG  —  paste your Apps Script Web App /exec URL below.
+   Leave it blank to run in demo mode (sample data, nothing saved).
+   ============================================================ */
+const CONFIG = {
+  WEB_APP_URL: ""   // e.g. "https://script.google.com/macros/s/AKfy.../exec"
+};
+
+/* ---- fields & zone mapping ---- */
+const CIRC = ["chest","upperArm","waist","hips","thighL","thighR"];
+const ZONE_LABEL = {chest:"Chest",upperArm:"Upper arm",waist:"Waist",hips:"Hips",thighL:"Thigh (L)",thighR:"Thigh (R)"};
+const NUM_FIELDS = ["weight",...CIRC,"bodyFat","bodyWater","boneMass","metabolicAge","bmr","calories"];
+
+let DATA = [];          // array of entry objects, oldest -> newest
+let sessionPin = "";
+let refMode = "start";  // 'start' | 'last'
+let charts = {};
+
+/* ---------- demo data ---------- */
+function demoData(){
+  const rows=[];
+  const start=new Date(); start.setDate(start.getDate()-7*6);
+  const base={weight:82,chest:98,upperArm:32,waist:86,hips:104,thighL:60,thighR:60.5,
+              bodyFat:38,bodyWater:46,boneMass:2.6,metabolicAge:44,bmr:1520,calories:1900};
+  for(let i=0;i<6;i++){
+    const d=new Date(start); d.setDate(d.getDate()+i*7);
+    const k=i*0.6;
+    rows.push({
+      date:d.toISOString().slice(0,10),
+      weight:+(base.weight-k*0.9).toFixed(1),
+      chest:+(base.chest-k*0.3).toFixed(1),
+      upperArm:+(base.upperArm-k*0.15).toFixed(1),
+      waist:+(base.waist-k*0.8).toFixed(1),
+      hips:+(base.hips-k*0.5).toFixed(1),
+      thighL:+(base.thighL-k*0.4).toFixed(1),
+      thighR:+(base.thighR-k*0.35).toFixed(1),
+      bodyFat:+(base.bodyFat-k*0.5).toFixed(1),
+      bodyWater:+(base.bodyWater+k*0.2).toFixed(1),
+      boneMass:base.boneMass,
+      metabolicAge:Math.round(base.metabolicAge-k*0.8),
+      bmr:Math.round(base.bmr-k*3),
+      calories:Math.round(base.calories-k*10)
+    });
+  }
+  return rows;
+}
+
+/* ---------- silhouette svg ---------- */
+function bodySVG(){
+  return `<svg viewBox="0 0 220 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Body outline">
+  <defs><clipPath id="bodyClip">
+    <ellipse cx="110" cy="40" rx="19" ry="23"/><rect x="102" y="58" width="16" height="14"/>
+    <path d="M72,72 C70,95 78,120 84,150 L88,175 C80,190 76,205 78,220 L100,232 L110,236 L120,232 L142,220 C144,205 140,190 132,175 L136,150 C142,120 150,95 148,72 C140,64 128,62 110,62 C92,62 80,64 72,72 Z"/>
+    <rect x="54" y="74" width="15" height="134" rx="7.5"/><rect x="151" y="74" width="15" height="134" rx="7.5"/>
+    <rect x="80" y="215" width="24" height="203" rx="11"/><rect x="116" y="215" width="24" height="203" rx="11"/>
+  </clipPath></defs>
+  <g fill="#e3d9f2">
+    <ellipse cx="110" cy="40" rx="19" ry="23"/><rect x="102" y="58" width="16" height="14"/>
+    <path d="M72,72 C70,95 78,120 84,150 L88,175 C80,190 76,205 78,220 L100,232 L110,236 L120,232 L142,220 C144,205 140,190 132,175 L136,150 C142,120 150,95 148,72 C140,64 128,62 110,62 C92,62 80,64 72,72 Z"/>
+    <rect x="54" y="74" width="15" height="134" rx="7.5"/><rect x="151" y="74" width="15" height="134" rx="7.5"/>
+    <rect x="80" y="215" width="24" height="203" rx="11"/><rect x="116" y="215" width="24" height="203" rx="11"/>
+  </g>
+  <g clip-path="url(#bodyClip)">
+    <rect class="zone" data-zone="chest"    x="60"  y="78"  width="100" height="40" fill="#c9bce0" opacity=".75"/>
+    <rect class="zone" data-zone="upperArm" x="52"  y="110" width="20"  height="65" fill="#c9bce0" opacity=".75"/>
+    <rect class="zone" data-zone="upperArm" x="148" y="110" width="20"  height="65" fill="#c9bce0" opacity=".75"/>
+    <rect class="zone" data-zone="waist"    x="70"  y="150" width="80"  height="35" fill="#c9bce0" opacity=".75"/>
+    <rect class="zone" data-zone="hips"     x="70"  y="185" width="80"  height="37" fill="#c9bce0" opacity=".75"/>
+    <rect class="zone" data-zone="thighL"   x="78"  y="222" width="28"  height="78" fill="#c9bce0" opacity=".75"/>
+    <rect class="zone" data-zone="thighR"   x="114" y="222" width="28"  height="78" fill="#c9bce0" opacity=".75"/>
+  </g></svg>`;
+}
+
+/* ---------- helpers ---------- */
+const $=id=>document.getElementById(id);
+function fmt(n,d=1){return (n==null||isNaN(n))?"—":Number(n).toFixed(d)}
+function dir(delta){ if(delta<=-0.1)return"down"; if(delta>=0.1)return"up"; return"same"; }
+function colFor(dir){ return dir==="down"?"#17b8a6":dir==="up"?"#f4a259":"#c9bce0"; }
+
+/* ---------- render ---------- */
+function render(){
+  $("figWrap").innerHTML=bodySVG();
+  const hasTwo = DATA.length>=2;
+  const latest = DATA[DATA.length-1]||{};
+  const ref = refMode==="start" ? (DATA[0]||{}) : (DATA[DATA.length-2]||{});
+
+  // zones + readout
+  const readout=$("readout"); readout.innerHTML="";
+  if(!hasTwo){
+    readout.innerHTML=`<div class="empty">Add a second week and your shape will start to light up here.</div>`;
+  }
+  CIRC.forEach(k=>{
+    const now=latest[k], was=ref[k];
+    let d=null,dr="same";
+    if(now!=null&&was!=null){ d=now-was; dr=dir(d); }
+    document.querySelectorAll(`.zone[data-zone="${k}"]`).forEach(z=>{
+      z.setAttribute("fill",colFor(dr));
+      z.classList.toggle("down",dr==="down");
+    });
+    if(hasTwo && now!=null && was!=null){
+      const row=document.createElement("div");
+      row.className="ritem";
+      const sign=d>0?"+":"";
+      row.innerHTML=`<span><b>${ZONE_LABEL[k]}</b> ${fmt(now)} cm</span>
+        <span class="delta ${dr}">${sign}${fmt(d)} cm</span>`;
+      readout.appendChild(row);
+    }
+  });
+  $("shapeSub").textContent = refMode==="start"
+    ? "Change since your very first entry" : "Change since last week";
+
+  // tiles
+  const tiles=$("tiles"); tiles.innerHTML="";
+  const prev=DATA[DATA.length-2]||{};
+  [["metabolicAge","Metabolic age","",0,true],
+   ["bmr","BMR","kcal",0,true],
+   ["boneMass","Bone mass","kg",1,false],
+   ["calories","Calories","kcal",0,true]].forEach(([k,lab,unit,dec,lowerGood])=>{
+    const now=latest[k], was=prev[k];
+    let chg="";
+    if(now!=null&&was!=null){
+      const d=now-was; const dr=dir(d);
+      const good = lowerGood ? d<0 : false;
+      const c = d===0?"var(--muted)":(good?"var(--down)":"var(--up)");
+      chg=`<div class="chg" style="color:${c}">${d>0?"+":""}${fmt(d,dec)} ${unit}</div>`;
+    }
+    tiles.innerHTML+=`<div class="tile"><div class="lab">${lab}</div>
+      <div class="val">${now==null?"—":fmt(now,dec)}<span style="font-size:.8rem;color:var(--muted)"> ${unit}</span></div>${chg}</div>`;
+  });
+
+  drawCharts();
+}
+
+/* ---------- charts ---------- */
+function baseOpts(){
+  return {responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{font:{family:'Nunito',weight:'700'},boxWidth:12,padding:12}}},
+    scales:{x:{grid:{display:false},ticks:{font:{family:'Nunito'}}},
+            y:{grid:{color:'#f0e9fa'},ticks:{font:{family:'Nunito'}}}},
+    interaction:{intersect:false,mode:'index'}};
+}
+function line(k,color){
+  return {label:ZONE_LABEL[k]||k,data:DATA.map(r=>r[k]??null),borderColor:color,
+    backgroundColor:color+'22',borderWidth:2.5,tension:.35,pointRadius:3,
+    pointBackgroundColor:color,spanGaps:true};
+}
+function drawCharts(){
+  const labels=DATA.map(r=>r.date? r.date.slice(5):"");
+  Object.values(charts).forEach(c=>c&&c.destroy());
+  if(DATA.length===0){
+    ["wrapWeight","wrapMeas","wrapComp"].forEach(w=>$(w).innerHTML='<div class="empty">No entries yet.</div>');
+    return;
+  }
+  charts.w=new Chart($("chartWeight"),{type:'line',
+    data:{labels,datasets:[line("weight","#a855f7")]},options:baseOpts()});
+  charts.m=new Chart($("chartMeas"),{type:'line',
+    data:{labels,datasets:[
+      line("waist","#ec4899"),line("hips","#a855f7"),line("chest","#17b8a6"),
+      line("thighL","#f4a259"),line("thighR","#e06c9f"),line("upperArm","#6c8ae0")]},
+    options:baseOpts()});
+  charts.c=new Chart($("chartComp"),{type:'line',
+    data:{labels,datasets:[
+      {label:"Body fat %",data:DATA.map(r=>r.bodyFat??null),borderColor:"#ec4899",
+       backgroundColor:"#ec489922",borderWidth:2.5,tension:.35,pointRadius:3,spanGaps:true},
+      {label:"Body water %",data:DATA.map(r=>r.bodyWater??null),borderColor:"#17b8a6",
+       backgroundColor:"#17b8a622",borderWidth:2.5,tension:.35,pointRadius:3,spanGaps:true}]},
+    options:baseOpts()});
+}
+
+/* ---------- data i/o ---------- */
+async function loadData(){
+  if(!CONFIG.WEB_APP_URL){ DATA=demoData(); $("demoBanner").style.display="block"; return; }
+  const url=CONFIG.WEB_APP_URL+"?pin="+encodeURIComponent(sessionPin);
+  const res=await fetch(url);
+  const json=await res.json();
+  if(json.error) throw new Error(json.error);
+  DATA=(json.rows||[]).map(normalise).sort((a,b)=>a.date<b.date?-1:1);
+}
+function normalise(r){
+  const o={date:r.date}; NUM_FIELDS.forEach(f=>{ o[f]=(r[f]===""||r[f]==null)?null:Number(r[f]); }); return o;
+}
+async function saveEntry(entry){
+  if(!CONFIG.WEB_APP_URL){ DATA.push(normalise(entry)); DATA.sort((a,b)=>a.date<b.date?-1:1); return {ok:true}; }
+  const res=await fetch(CONFIG.WEB_APP_URL,{
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},   // text/plain avoids CORS preflight
+    body:JSON.stringify({pin:sessionPin,entry})
+  });
+  const json=await res.json();
+  if(json.error) throw new Error(json.error);
+  await loadData();
+  return {ok:true};
+}
+
+/* ---------- events ---------- */
+async function unlock(){
+  const pin=$("pinInput").value.trim();
+  if(!pin){return;}
+  sessionPin=pin;
+  try{
+    await loadData();
+    $("gate").style.display="none";
+    $("app").style.display="block";
+    render();
+  }catch(e){
+    $("pinErr").style.display="block";
+    sessionPin="";
+  }
+}
+$("pinBtn").addEventListener("click",unlock);
+$("pinInput").addEventListener("keydown",e=>{if(e.key==="Enter")unlock();});
+
+$("saveBtn").addEventListener("click",async()=>{
+  const entry={date:$("in_date").value||new Date().toISOString().slice(0,10)};
+  NUM_FIELDS.forEach(f=>{ const v=$("in_"+f).value; entry[f]=v===""?"":Number(v); });
+  const msg=$("saveMsg");
+  $("saveBtn").disabled=true; msg.style.display="block"; msg.style.color="var(--muted)"; msg.textContent="Saving…";
+  try{
+    await saveEntry(entry);
+    msg.style.color="var(--down)"; msg.textContent="Saved. Lovely work this week 💜";
+    NUM_FIELDS.forEach(f=>$("in_"+f).value="");
+    render();
+    setTimeout(()=>{document.querySelector("details.entry").open=false;},900);
+  }catch(e){
+    msg.style.color="#d64545"; msg.textContent="Couldn't save: "+e.message;
+  }finally{ $("saveBtn").disabled=false; }
+});
+
+document.querySelectorAll("#refToggle button").forEach(b=>{
+  b.addEventListener("click",()=>{
+    document.querySelectorAll("#refToggle button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on"); refMode=b.dataset.ref; render();
+  });
+});
+
+// default date = today
+$("in_date").value=new Date().toISOString().slice(0,10);
+</script>
+</body>
+</html>
