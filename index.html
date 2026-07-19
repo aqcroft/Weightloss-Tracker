@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en-GB">
 <head>
@@ -67,6 +66,9 @@
   label.f input{font-family:'Nunito';font-weight:700;font-size:1rem;color:var(--ink);
     padding:10px 11px;border:1.5px solid var(--line);border-radius:11px}
   label.f input:focus{outline:none;border-color:var(--grad1)}
+  label.f textarea{font-family:'Nunito';font-weight:600;font-size:1rem;color:var(--ink);
+    padding:10px 11px;border:1.5px solid var(--line);border-radius:11px;resize:vertical}
+  label.f textarea:focus{outline:none;border-color:var(--grad1)}
   .fieldset-title{font-weight:800;color:var(--ink);font-size:.82rem;margin:14px 0 6px;
     text-transform:uppercase;letter-spacing:.06em}
   details.entry summary{list-style:none;cursor:pointer;font-family:'Fraunces';font-weight:600;
@@ -150,7 +152,8 @@
           <label class="f">Chest<input id="in_chest" type="number" step="0.1" inputmode="decimal"></label>
           <label class="f">Waist<input id="in_waist" type="number" step="0.1" inputmode="decimal"></label>
           <label class="f">Hips<input id="in_hips" type="number" step="0.1" inputmode="decimal"></label>
-          <label class="f">Upper arm<input id="in_upperArm" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Upper arm (L)<input id="in_upperArmL" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Upper arm (R)<input id="in_upperArmR" type="number" step="0.1" inputmode="decimal"></label>
           <label class="f">Thigh (L)<input id="in_thighL" type="number" step="0.1" inputmode="decimal"></label>
           <label class="f">Thigh (R)<input id="in_thighR" type="number" step="0.1" inputmode="decimal"></label>
         </div>
@@ -158,11 +161,16 @@
         <div class="grid">
           <label class="f">Body fat (%)<input id="in_bodyFat" type="number" step="0.1" inputmode="decimal"></label>
           <label class="f">Body water (%)<input id="in_bodyWater" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Muscle mass (kg)<input id="in_muscleMass" type="number" step="0.1" inputmode="decimal"></label>
           <label class="f">Bone mass (kg)<input id="in_boneMass" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Visceral fat<input id="in_visceralFat" type="number" step="1" inputmode="numeric"></label>
           <label class="f">Metabolic age<input id="in_metabolicAge" type="number" step="1" inputmode="numeric"></label>
           <label class="f">BMR (kcal)<input id="in_bmr" type="number" step="1" inputmode="numeric"></label>
-          <label class="f">Calorie intake<input id="in_calories" type="number" step="1" inputmode="numeric"></label>
         </div>
+        <div class="fieldset-title">Notes</div>
+        <label class="f">Anything worth remembering this week
+          <textarea id="in_notes" rows="2" placeholder="How you felt, what changed, a win to remember…"></textarea>
+        </label>
         <button class="primary" id="saveBtn">Save this week</button>
         <p id="saveMsg" style="text-align:center;font-weight:700;font-size:.85rem;margin:10px 0 0;display:none"></p>
       </div>
@@ -195,22 +203,26 @@
     <h2>Latest readings</h2>
     <p class="sub">Change shown against your previous entry</p>
     <div class="tiles" id="tiles"></div>
+    <div id="noteLine"></div>
   </div>
 
   <!-- CHARTS -->
   <div class="card">
     <h2>Weight</h2>
-    <div id="wrapWeight"><canvas id="chartWeight" height="200"></canvas></div>
+    <div id="wrapWeight"><canvas id="chartWeight" height="200"></canvas>
+      <p class="empty chartEmpty" style="display:none">No entries yet.</p></div>
   </div>
   <div class="card">
     <h2>Measurements</h2>
     <p class="sub">All the tape-measure numbers, over time</p>
-    <div id="wrapMeas"><canvas id="chartMeas" height="220"></canvas></div>
+    <div id="wrapMeas"><canvas id="chartMeas" height="220"></canvas>
+      <p class="empty chartEmpty" style="display:none">No entries yet.</p></div>
   </div>
   <div class="card">
     <h2>Body composition</h2>
     <p class="sub">Body fat and water percentage</p>
-    <div id="wrapComp"><canvas id="chartComp" height="200"></canvas></div>
+    <div id="wrapComp"><canvas id="chartComp" height="200"></canvas>
+      <p class="empty chartEmpty" style="display:none">No entries yet.</p></div>
   </div>
 
   <p class="foot">Made with love. Every entry is a little win. 💜</p>
@@ -222,13 +234,16 @@
    Leave it blank to run in demo mode (sample data, nothing saved).
    ============================================================ */
 const CONFIG = {
-  WEB_APP_URL: "https://script.google.com/macros/s/AKfycbzZ3lYWwnG46tJ6APqFSedxNXYsp_20LZWZscQKG7qu9RiGXs4LzrfbTlSOW2-BEc4/exec"
+  WEB_APP_URL: ""   // e.g. "https://script.google.com/macros/s/AKfy.../exec"
 };
 
 /* ---- fields & zone mapping ---- */
-const CIRC = ["chest","upperArm","waist","hips","thighL","thighR"];
-const ZONE_LABEL = {chest:"Chest",upperArm:"Upper arm",waist:"Waist",hips:"Hips",thighL:"Thigh (L)",thighR:"Thigh (R)"};
-const NUM_FIELDS = ["weight",...CIRC,"bodyFat","bodyWater","boneMass","metabolicAge","bmr","calories"];
+const CIRC = ["chest","upperArmL","upperArmR","waist","hips","thighL","thighR"];
+const ZONE_LABEL = {chest:"Chest",upperArmL:"Upper arm (L)",upperArmR:"Upper arm (R)",waist:"Waist",hips:"Hips",thighL:"Thigh (L)",thighR:"Thigh (R)"};
+const SCALE_FIELDS = ["bodyFat","bodyWater","muscleMass","boneMass","visceralFat","metabolicAge","bmr"];
+const NUM_FIELDS = ["weight",...CIRC,...SCALE_FIELDS];
+const FIELD_LABEL = {weight:"Weight",...ZONE_LABEL,bodyFat:"Body fat %",bodyWater:"Body water %",
+  muscleMass:"Muscle mass",boneMass:"Bone mass",visceralFat:"Visceral fat",metabolicAge:"Metabolic age",bmr:"BMR"};
 
 let DATA = [];          // array of entry objects, oldest -> newest
 let sessionPin = "";
@@ -239,8 +254,8 @@ let charts = {};
 function demoData(){
   const rows=[];
   const start=new Date(); start.setDate(start.getDate()-7*6);
-  const base={weight:82,chest:98,upperArm:32,waist:86,hips:104,thighL:60,thighR:60.5,
-              bodyFat:38,bodyWater:46,boneMass:2.6,metabolicAge:44,bmr:1520,calories:1900};
+  const base={weight:82,chest:98,upperArmL:32,upperArmR:31.6,waist:86,hips:104,thighL:60,thighR:60.5,
+              bodyFat:38,bodyWater:46,muscleMass:48,boneMass:2.6,visceralFat:9,metabolicAge:44,bmr:1520};
   for(let i=0;i<6;i++){
     const d=new Date(start); d.setDate(d.getDate()+i*7);
     const k=i*0.6;
@@ -248,17 +263,20 @@ function demoData(){
       date:d.toISOString().slice(0,10),
       weight:+(base.weight-k*0.9).toFixed(1),
       chest:+(base.chest-k*0.3).toFixed(1),
-      upperArm:+(base.upperArm-k*0.15).toFixed(1),
+      upperArmL:+(base.upperArmL-k*0.15).toFixed(1),
+      upperArmR:+(base.upperArmR-k*0.13).toFixed(1),
       waist:+(base.waist-k*0.8).toFixed(1),
       hips:+(base.hips-k*0.5).toFixed(1),
       thighL:+(base.thighL-k*0.4).toFixed(1),
       thighR:+(base.thighR-k*0.35).toFixed(1),
       bodyFat:+(base.bodyFat-k*0.5).toFixed(1),
       bodyWater:+(base.bodyWater+k*0.2).toFixed(1),
+      muscleMass:+(base.muscleMass+k*0.1).toFixed(1),
       boneMass:base.boneMass,
+      visceralFat:Math.round(base.visceralFat-k*0.15),
       metabolicAge:Math.round(base.metabolicAge-k*0.8),
       bmr:Math.round(base.bmr-k*3),
-      calories:Math.round(base.calories-k*10)
+      notes:i===5?"Felt strong this week, clothes looser":""
     });
   }
   return rows;
@@ -281,8 +299,8 @@ function bodySVG(){
   </g>
   <g clip-path="url(#bodyClip)">
     <rect class="zone" data-zone="chest"    x="60"  y="78"  width="100" height="40" fill="#c9bce0" opacity=".75"/>
-    <rect class="zone" data-zone="upperArm" x="52"  y="110" width="20"  height="65" fill="#c9bce0" opacity=".75"/>
-    <rect class="zone" data-zone="upperArm" x="148" y="110" width="20"  height="65" fill="#c9bce0" opacity=".75"/>
+    <rect class="zone" data-zone="upperArmL" x="52"  y="110" width="20"  height="65" fill="#c9bce0" opacity=".75"/>
+    <rect class="zone" data-zone="upperArmR" x="148" y="110" width="20"  height="65" fill="#c9bce0" opacity=".75"/>
     <rect class="zone" data-zone="waist"    x="70"  y="150" width="80"  height="35" fill="#c9bce0" opacity=".75"/>
     <rect class="zone" data-zone="hips"     x="70"  y="185" width="80"  height="37" fill="#c9bce0" opacity=".75"/>
     <rect class="zone" data-zone="thighL"   x="78"  y="222" width="28"  height="78" fill="#c9bce0" opacity=".75"/>
@@ -295,6 +313,7 @@ const $=id=>document.getElementById(id);
 function fmt(n,d=1){return (n==null||isNaN(n))?"—":Number(n).toFixed(d)}
 function dir(delta){ if(delta<=-0.1)return"down"; if(delta>=0.1)return"up"; return"same"; }
 function colFor(dir){ return dir==="down"?"#17b8a6":dir==="up"?"#f4a259":"#c9bce0"; }
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 /* ---------- render ---------- */
 function render(){
@@ -331,21 +350,29 @@ function render(){
   // tiles
   const tiles=$("tiles"); tiles.innerHTML="";
   const prev=DATA[DATA.length-2]||{};
-  [["metabolicAge","Metabolic age","",0,true],
-   ["bmr","BMR","kcal",0,true],
-   ["boneMass","Bone mass","kg",1,false],
-   ["calories","Calories","kcal",0,true]].forEach(([k,lab,unit,dec,lowerGood])=>{
+  [["muscleMass","Muscle mass","kg",1,"up"],
+   ["visceralFat","Visceral fat","",0,"down"],
+   ["metabolicAge","Metabolic age","",0,"down"],
+   ["boneMass","Bone mass","kg",1,null],
+   ["bmr","BMR","kcal",0,null]].forEach(([k,lab,unit,dec,goodDir])=>{
     const now=latest[k], was=prev[k];
     let chg="";
     if(now!=null&&was!=null){
-      const d=now-was; const dr=dir(d);
-      const good = lowerGood ? d<0 : false;
-      const c = d===0?"var(--muted)":(good?"var(--down)":"var(--up)");
+      const d=now-was;
+      let c="var(--muted)";
+      if(d!==0 && goodDir){ const good = goodDir==="down" ? d<0 : d>0; c = good?"var(--down)":"var(--up)"; }
       chg=`<div class="chg" style="color:${c}">${d>0?"+":""}${fmt(d,dec)} ${unit}</div>`;
     }
     tiles.innerHTML+=`<div class="tile"><div class="lab">${lab}</div>
       <div class="val">${now==null?"—":fmt(now,dec)}<span style="font-size:.8rem;color:var(--muted)"> ${unit}</span></div>${chg}</div>`;
   });
+
+  // latest note
+  const note = latest.notes;
+  $("noteLine").innerHTML = note
+    ? `<div style="margin-top:12px;padding:11px 13px;background:#faf6ff;border:1px solid var(--line);border-radius:12px;font-size:.9rem">
+         <b style="font-family:'Fraunces';font-weight:600">This week:</b> ${escapeHtml(note)}</div>`
+    : "";
 
   drawCharts();
 }
@@ -365,17 +392,27 @@ function line(k,color){
 }
 function drawCharts(){
   const labels=DATA.map(r=>r.date? r.date.slice(5):"");
-  Object.values(charts).forEach(c=>c&&c.destroy());
-  if(DATA.length===0){
-    ["wrapWeight","wrapMeas","wrapComp"].forEach(w=>$(w).innerHTML='<div class="empty">No entries yet.</div>');
-    return;
-  }
+  Object.values(charts).forEach(c=>{try{c&&c.destroy();}catch(e){}});
+  charts={};
+  const empty = DATA.length===0;
+  // keep canvases in the DOM; just hide them and show a message when empty
+  ["chartWeight","chartMeas","chartComp"].forEach(id=>{
+    const cv=$(id);
+    if(cv){
+      cv.style.display = empty ? "none" : "block";
+      const ex = (window.Chart && Chart.getChart) ? Chart.getChart(cv) : null;
+      if(ex){ try{ ex.destroy(); }catch(e){} }
+    }
+  });
+  document.querySelectorAll(".chartEmpty").forEach(e=>e.style.display = empty ? "block" : "none");
+  if(empty || !window.Chart) return;
   charts.w=new Chart($("chartWeight"),{type:'line',
     data:{labels,datasets:[line("weight","#a855f7")]},options:baseOpts()});
   charts.m=new Chart($("chartMeas"),{type:'line',
     data:{labels,datasets:[
       line("waist","#ec4899"),line("hips","#a855f7"),line("chest","#17b8a6"),
-      line("thighL","#f4a259"),line("thighR","#e06c9f"),line("upperArm","#6c8ae0")]},
+      line("thighL","#f4a259"),line("thighR","#e06c9f"),
+      line("upperArmL","#6c8ae0"),line("upperArmR","#b07cc9")]},
     options:baseOpts()});
   charts.c=new Chart($("chartComp"),{type:'line',
     data:{labels,datasets:[
@@ -396,7 +433,9 @@ async function loadData(){
   DATA=(json.rows||[]).map(normalise).sort((a,b)=>a.date<b.date?-1:1);
 }
 function normalise(r){
-  const o={date:r.date}; NUM_FIELDS.forEach(f=>{ o[f]=(r[f]===""||r[f]==null)?null:Number(r[f]); }); return o;
+  const o={date:r.date, notes:(r.notes==null?"":String(r.notes))};
+  NUM_FIELDS.forEach(f=>{ o[f]=(r[f]===""||r[f]==null)?null:Number(r[f]); });
+  return o;
 }
 async function saveEntry(entry){
   if(!CONFIG.WEB_APP_URL){ DATA.push(normalise(entry)); DATA.sort((a,b)=>a.date<b.date?-1:1); return {ok:true}; }
@@ -430,16 +469,39 @@ $("pinBtn").addEventListener("click",unlock);
 $("pinInput").addEventListener("keydown",e=>{if(e.key==="Enter")unlock();});
 
 $("saveBtn").addEventListener("click",async()=>{
-  const entry={date:$("in_date").value||new Date().toISOString().slice(0,10)};
-  NUM_FIELDS.forEach(f=>{ const v=$("in_"+f).value; entry[f]=v===""?"":Number(v); });
   const msg=$("saveMsg");
+  const entry={date:$("in_date").value||new Date().toISOString().slice(0,10)};
+  NUM_FIELDS.forEach(f=>{ const v=$("in_"+f).value.trim(); entry[f]=v===""?"":Number(v); });
+  entry.notes=$("in_notes").value.trim();
+
+  // weight is required and must read as a real number
+  const wEl=$("in_weight");
+  if(wEl.validity && wEl.validity.badInput){
+    msg.style.display="block"; msg.style.color="#d64545";
+    msg.textContent="That weight didn't read as a number. Check for a stray space, letter or comma, then re-enter.";
+    return;
+  }
+  if(entry.weight===""){
+    msg.style.display="block"; msg.style.color="#d64545";
+    msg.textContent="Weight is the one field we really need. Pop it in and try again.";
+    return;
+  }
+  // everything else can be left blank; just say which
+  const blanks=NUM_FIELDS.filter(f=>f!=="weight" && entry[f]==="").map(f=>FIELD_LABEL[f]);
+
   $("saveBtn").disabled=true; msg.style.display="block"; msg.style.color="var(--muted)"; msg.textContent="Saving…";
   try{
     await saveEntry(entry);
-    msg.style.color="var(--down)"; msg.textContent="Saved. Lovely work this week 💜";
-    NUM_FIELDS.forEach(f=>$("in_"+f).value="");
-    render();
-    setTimeout(()=>{document.querySelector("details.entry").open=false;},900);
+    msg.style.color="var(--down)";
+    const blankMsg = blanks.length===0 ? ""
+      : blanks.length<=5 ? "Left blank: "+blanks.join(", ")+"."
+      : blanks.length+" fields left blank this week.";
+    msg.textContent = blankMsg
+      ? "Saved. "+blankMsg+" No problem, those points just get skipped."
+      : "Saved. Lovely work this week 💜";
+    NUM_FIELDS.forEach(f=>$("in_"+f).value=""); $("in_notes").value="";
+    try{ render(); }catch(e){ console.error("post-save render:",e); }
+    setTimeout(()=>{document.querySelector("details.entry").open=false;}, blanks.length?2600:1200);
   }catch(e){
     msg.style.color="#d64545"; msg.textContent="Couldn't save: "+e.message;
   }finally{ $("saveBtn").disabled=false; }
