@@ -83,8 +83,7 @@
     background:linear-gradient(180deg,#fbf7ff,#f6ecff);border-radius:16px;padding:10px;min-width:170px}
   .figure svg{width:100%;height:auto;max-width:190px}
   .zone{transition:fill .5s ease,opacity .4s ease;cursor:pointer}
-  .zone.down{animation:pulse 2.4s ease-in-out infinite}
-  @keyframes pulse{0%,100%{opacity:.7}50%{opacity:.95}}
+  .zone.down{opacity:.92}
   .readout{flex:1;min-width:190px;display:flex;flex-direction:column;justify-content:center;gap:8px}
   .ritem{display:flex;justify-content:space-between;align-items:baseline;
     padding:8px 12px;border-radius:12px;background:#faf6ff;font-size:.9rem}
@@ -107,10 +106,11 @@
   .tile .val{font-family:'Fraunces';font-weight:600;font-size:1.4rem;margin-top:2px}
   .tile .chg{font-size:.78rem;font-weight:800}
 
-  canvas{margin-top:6px}
+  .chartbox{position:relative;height:220px;width:100%;margin-top:6px}
   .empty{color:var(--muted);font-size:.9rem;text-align:center;padding:22px 8px}
   .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:26px}
   @media(max-width:430px){ .figure{flex:1 1 100%} }
+  @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important;scroll-behavior:auto!important} }
 </style>
 </head>
 <body>
@@ -209,20 +209,26 @@
   <!-- CHARTS -->
   <div class="card">
     <h2>Weight</h2>
-    <div id="wrapWeight"><canvas id="chartWeight" height="200"></canvas>
-      <p class="empty chartEmpty" style="display:none">No entries yet.</p></div>
+    <div id="wrapWeight">
+      <div class="chartbox"><canvas id="chartWeight"></canvas></div>
+      <p class="empty chartEmpty" style="display:none">No entries yet.</p>
+    </div>
   </div>
   <div class="card">
     <h2>Measurements</h2>
     <p class="sub">All the tape-measure numbers, over time</p>
-    <div id="wrapMeas"><canvas id="chartMeas" height="220"></canvas>
-      <p class="empty chartEmpty" style="display:none">No entries yet.</p></div>
+    <div id="wrapMeas">
+      <div class="chartbox"><canvas id="chartMeas"></canvas></div>
+      <p class="empty chartEmpty" style="display:none">No entries yet.</p>
+    </div>
   </div>
   <div class="card">
     <h2>Body composition</h2>
     <p class="sub">Body fat and water percentage</p>
-    <div id="wrapComp"><canvas id="chartComp" height="200"></canvas>
-      <p class="empty chartEmpty" style="display:none">No entries yet.</p></div>
+    <div id="wrapComp">
+      <div class="chartbox"><canvas id="chartComp"></canvas></div>
+      <p class="empty chartEmpty" style="display:none">No entries yet.</p>
+    </div>
   </div>
 
   <p class="foot">Made with love. Every entry is a little win. 💜</p>
@@ -379,7 +385,7 @@ function render(){
 
 /* ---------- charts ---------- */
 function baseOpts(){
-  return {responsive:true,maintainAspectRatio:false,
+  return {responsive:true,maintainAspectRatio:false,animation:false,resizeDelay:150,
     plugins:{legend:{labels:{font:{family:'Nunito',weight:'700'},boxWidth:12,padding:12}}},
     scales:{x:{grid:{display:false},ticks:{font:{family:'Nunito'}}},
             y:{grid:{color:'#f0e9fa'},ticks:{font:{family:'Nunito'}}}},
@@ -399,7 +405,8 @@ function drawCharts(){
   ["chartWeight","chartMeas","chartComp"].forEach(id=>{
     const cv=$(id);
     if(cv){
-      cv.style.display = empty ? "none" : "block";
+      const box=cv.closest(".chartbox");
+      if(box) box.style.display = empty ? "none" : "block";
       const ex = (window.Chart && Chart.getChart) ? Chart.getChart(cv) : null;
       if(ex){ try{ ex.destroy(); }catch(e){} }
     }
