@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en-GB">
 <head>
@@ -113,6 +114,13 @@
   .tile .val{font-family:'Fraunces';font-weight:600;font-size:1.4rem;margin-top:2px}
   .tile .chg{font-size:.78rem;font-weight:800}
 
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin:2px 0 12px}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);
+    background:#fff;color:var(--ink);font-family:'Nunito';font-weight:700;font-size:.8rem;
+    padding:6px 11px;border-radius:999px;cursor:pointer;user-select:none;transition:opacity .2s}
+  .chip .cdot{width:10px;height:10px;border-radius:50%}
+  .chip.off{opacity:.42;background:#f6f1fc}
+
   .chartbox{position:relative;height:220px;width:100%;margin-top:6px}
   .empty{color:var(--muted);font-size:.9rem;text-align:center;padding:22px 8px}
   .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:26px}
@@ -167,12 +175,13 @@
         <div class="fieldset-title">From the scales</div>
         <div class="grid">
           <label class="f">Body fat (%)<input id="in_bodyFat" type="number" step="0.1" inputmode="decimal"></label>
+          <label class="f">Bone mass (kg)<input id="in_boneMass" type="number" step="0.1" inputmode="decimal"></label>
           <label class="f">Body water (%)<input id="in_bodyWater" type="number" step="0.1" inputmode="decimal"></label>
           <label class="f">Muscle mass (kg)<input id="in_muscleMass" type="number" step="0.1" inputmode="decimal"></label>
-          <label class="f">Bone mass (kg)<input id="in_boneMass" type="number" step="0.1" inputmode="decimal"></label>
-          <label class="f">Visceral fat<input id="in_visceralFat" type="number" step="1" inputmode="numeric"></label>
-          <label class="f">Metabolic age<input id="in_metabolicAge" type="number" step="1" inputmode="numeric"></label>
+          <label class="f">Body shape<input id="in_bodyShape" type="number" step="1" inputmode="numeric"></label>
           <label class="f">BMR (kcal)<input id="in_bmr" type="number" step="1" inputmode="numeric"></label>
+          <label class="f">Metabolic age<input id="in_metabolicAge" type="number" step="1" inputmode="numeric"></label>
+          <label class="f">Visceral fat<input id="in_visceralFat" type="number" step="1" inputmode="numeric"></label>
         </div>
         <div class="fieldset-title">Notes</div>
         <label class="f">Anything worth remembering this week
@@ -223,7 +232,8 @@
   </div>
   <div class="card">
     <h2>Measurements</h2>
-    <p class="sub">All the tape-measure numbers, over time</p>
+    <p class="sub">Tap to show or hide lines. The scale adjusts to what you pick.</p>
+    <div id="measFilter" class="chips"></div>
     <div id="wrapMeas">
       <div class="chartbox"><canvas id="chartMeas"></canvas></div>
       <p class="empty chartEmpty" style="display:none">No entries yet.</p>
@@ -247,16 +257,16 @@
    Leave it blank to run in demo mode (sample data, nothing saved).
    ============================================================ */
 const CONFIG = {
-  WEB_APP_URL: "https://script.google.com/macros/s/AKfycbx00dfr9_hww6lqpkubH1XxI5UbYAA8H4sWJGVbhhZPUqU02a6eBdln3GXxUBtBHdSn/exec"   // e.g. "https://script.google.com/macros/s/AKfy.../exec"
+  WEB_APP_URL: "https://script.google.com/macros/s/AKfycbz1bWsAHzr2om-lwUoFCaFWcShsX2rVthe3Mjtybom5MsVbiBAZdGYDcL1xdd4lIi3S/exec"
 };
 
 /* ---- fields & zone mapping ---- */
 const CIRC = ["chest","upperArmL","upperArmR","waist","hips","thighL","thighR"];
 const ZONE_LABEL = {chest:"Chest",upperArmL:"Upper arm (L)",upperArmR:"Upper arm (R)",waist:"Waist",hips:"Hips",thighL:"Thigh (L)",thighR:"Thigh (R)"};
-const SCALE_FIELDS = ["bodyFat","bodyWater","muscleMass","boneMass","visceralFat","metabolicAge","bmr"];
+const SCALE_FIELDS = ["bodyFat","boneMass","bodyWater","muscleMass","bodyShape","bmr","metabolicAge","visceralFat"];
 const NUM_FIELDS = ["weight",...CIRC,...SCALE_FIELDS];
 const FIELD_LABEL = {weight:"Weight",...ZONE_LABEL,bodyFat:"Body fat %",bodyWater:"Body water %",
-  muscleMass:"Muscle mass",boneMass:"Bone mass",visceralFat:"Visceral fat",metabolicAge:"Metabolic age",bmr:"BMR"};
+  muscleMass:"Muscle mass",boneMass:"Bone mass",visceralFat:"Visceral fat",bodyShape:"Body shape",metabolicAge:"Metabolic age",bmr:"BMR"};
 
 let DATA = [];          // array of entry objects, oldest -> newest
 let sessionPin = "";
@@ -268,7 +278,7 @@ function demoData(){
   const rows=[];
   const start=new Date(); start.setDate(start.getDate()-7*6);
   const base={weight:82,chest:98,upperArmL:32,upperArmR:31.6,waist:86,hips:104,thighL:60,thighR:60.5,
-              bodyFat:38,bodyWater:46,muscleMass:48,boneMass:2.6,visceralFat:9,metabolicAge:44,bmr:1520};
+              bodyFat:38,bodyWater:46,muscleMass:48,boneMass:2.6,visceralFat:9,bodyShape:3,metabolicAge:44,bmr:1520};
   for(let i=0;i<6;i++){
     const d=new Date(start); d.setDate(d.getDate()+i*7);
     const k=i*0.6;
@@ -287,6 +297,7 @@ function demoData(){
       muscleMass:+(base.muscleMass+k*0.1).toFixed(1),
       boneMass:base.boneMass,
       visceralFat:Math.round(base.visceralFat-k*0.15),
+      bodyShape:i<4?3:2,
       metabolicAge:Math.round(base.metabolicAge-k*0.8),
       bmr:Math.round(base.bmr-k*3),
       notes:i===5?"Felt strong this week, clothes looser":""
@@ -327,6 +338,10 @@ function fmt(n,d=1){return (n==null||isNaN(n))?"—":Number(n).toFixed(d)}
 function dir(delta){ if(delta<=-0.1)return"down"; if(delta>=0.1)return"up"; return"same"; }
 function colFor(dir){ return dir==="down"?"#17b8a6":dir==="up"?"#f4a259":"#c9bce0"; }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function dateParts(s){ const p=String(s||"").slice(0,10).split("-"); return p.length===3?p:null; }
+function shortDate(s){ const p=dateParts(s); return p?(+p[2])+"/"+(+p[1]):""; }        // 14/8
+function fullDate(s){ const p=dateParts(s); if(!p) return ""; 
+  const m=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+p[1]-1]; return (+p[2])+" "+m+" "+p[0]; }
 
 /* ---------- render ---------- */
 function render(){
@@ -366,6 +381,7 @@ function render(){
   [["muscleMass","Muscle mass","kg",1,"up"],
    ["visceralFat","Visceral fat","",0,"down"],
    ["metabolicAge","Metabolic age","",0,"down"],
+   ["bodyShape","Body shape","",0,null],
    ["boneMass","Bone mass","kg",1,null],
    ["bmr","BMR","kcal",0,null]].forEach(([k,lab,unit,dec,goodDir])=>{
     const now=latest[k], was=prev[k];
@@ -387,15 +403,17 @@ function render(){
          <b style="font-family:'Fraunces';font-weight:600">This week:</b> ${escapeHtml(note)}</div>`
     : "";
 
+  buildMeasChips();
   drawCharts();
 }
 
 /* ---------- charts ---------- */
 function baseOpts(){
   return {responsive:true,maintainAspectRatio:false,animation:false,resizeDelay:150,
-    plugins:{legend:{labels:{font:{family:'Nunito',weight:'700'},boxWidth:12,padding:12}}},
-    scales:{x:{grid:{display:false},ticks:{font:{family:'Nunito'}}},
-            y:{grid:{color:'#f0e9fa'},ticks:{font:{family:'Nunito'}}}},
+    plugins:{legend:{labels:{font:{family:'Nunito',weight:'700'},boxWidth:12,padding:12}},
+             tooltip:{callbacks:{title:items=>items.length?fullDate(DATA[items[0].dataIndex]&&DATA[items[0].dataIndex].date):""}}},
+    scales:{x:{grid:{display:false},ticks:{font:{family:'Nunito'},maxRotation:0,autoSkip:true,maxTicksLimit:8}},
+            y:{grace:'8%',grid:{color:'#f0e9fa'},ticks:{font:{family:'Nunito'}}}},
     interaction:{intersect:false,mode:'index'}};
 }
 function line(k,color){
@@ -403,8 +421,31 @@ function line(k,color){
     backgroundColor:color+'22',borderWidth:2.5,tension:.35,pointRadius:3,
     pointBackgroundColor:color,spanGaps:true};
 }
+
+// which measurement lines are showing (tap chips to change); axis rescales to these
+const MEAS = [
+  {k:"waist",c:"#ec4899"},{k:"hips",c:"#a855f7"},{k:"chest",c:"#17b8a6"},
+  {k:"thighL",c:"#f4a259"},{k:"thighR",c:"#e06c9f"},
+  {k:"upperArmL",c:"#6c8ae0"},{k:"upperArmR",c:"#b07cc9"}
+];
+let selectedMeas = new Set(["waist","hips"]);
+function buildMeasChips(){
+  const host=$("measFilter"); if(!host || host.childElementCount) return;
+  MEAS.forEach(({k,c})=>{
+    const el=document.createElement("span");
+    el.className="chip"+(selectedMeas.has(k)?"":" off");
+    el.innerHTML=`<span class="cdot" style="background:${c}"></span>${ZONE_LABEL[k]}`;
+    el.addEventListener("click",()=>{
+      if(selectedMeas.has(k)) selectedMeas.delete(k); else selectedMeas.add(k);
+      el.classList.toggle("off");
+      drawCharts();
+    });
+    host.appendChild(el);
+  });
+}
+
 function drawCharts(){
-  const labels=DATA.map(r=>r.date? r.date.slice(5):"");
+  const labels=DATA.map(r=>shortDate(r.date));
   Object.values(charts).forEach(c=>{try{c&&c.destroy();}catch(e){}});
   charts={};
   const empty = DATA.length===0;
@@ -420,14 +461,15 @@ function drawCharts(){
   });
   document.querySelectorAll(".chartEmpty").forEach(e=>e.style.display = empty ? "block" : "none");
   if(empty || !window.Chart) return;
+
   charts.w=new Chart($("chartWeight"),{type:'line',
     data:{labels,datasets:[line("weight","#a855f7")]},options:baseOpts()});
+
+  const measOpts=baseOpts(); measOpts.plugins.legend.display=false;   // chips act as the legend
   charts.m=new Chart($("chartMeas"),{type:'line',
-    data:{labels,datasets:[
-      line("waist","#ec4899"),line("hips","#a855f7"),line("chest","#17b8a6"),
-      line("thighL","#f4a259"),line("thighR","#e06c9f"),
-      line("upperArmL","#6c8ae0"),line("upperArmR","#b07cc9")]},
-    options:baseOpts()});
+    data:{labels,datasets:MEAS.filter(m=>selectedMeas.has(m.k)).map(m=>line(m.k,m.c))},
+    options:measOpts});
+
   charts.c=new Chart($("chartComp"),{type:'line',
     data:{labels,datasets:[
       {label:"Body fat %",data:DATA.map(r=>r.bodyFat??null),borderColor:"#ec4899",
