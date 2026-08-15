@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en-GB">
 <head>
@@ -122,6 +121,17 @@
   .chip.off{opacity:.42;background:#f6f1fc}
 
   .chartbox{position:relative;height:220px;width:100%;margin-top:6px}
+  .chartbox.mini{height:150px}
+  .mini-title{font-family:'Fraunces';font-weight:600;font-size:1rem;margin:14px 0 0;color:var(--ink)}
+  .mini-title:first-child{margin-top:2px}
+  .tile-flag{font-size:.72rem;font-weight:800;color:#d64545;margin-top:3px}
+  .p-range{text-align:center;margin:4px 0 14px}
+  .p-range .big{font-family:'Fraunces';font-weight:600;font-size:2.1rem;color:var(--ink)}
+  .p-range .cap{color:var(--muted);font-weight:700;font-size:.85rem}
+  .pband{background:#faf6ff;border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:9px}
+  .pband .h{font-weight:800;font-size:.9rem;color:var(--ink)}
+  .pband .t{font-size:.85rem;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.4}
+  .p-basis{font-size:.78rem;color:var(--muted);font-weight:600;margin-top:10px;line-height:1.45}
   .empty{color:var(--muted);font-size:.9rem;text-align:center;padding:22px 8px}
   .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:26px}
   @media(max-width:430px){ .figure{flex:1 1 100%} }
@@ -222,6 +232,13 @@
     <div id="noteLine"></div>
   </div>
 
+  <!-- PROTEIN GUIDE -->
+  <div class="card">
+    <h2>Protein guide</h2>
+    <p class="sub">A general daily range to help preserve muscle while losing fat. A guide, not medical advice.</p>
+    <div id="proteinBody"></div>
+  </div>
+
   <!-- CHARTS -->
   <div class="card">
     <h2>Weight</h2>
@@ -246,6 +263,13 @@
       <div class="chartbox"><canvas id="chartComp"></canvas></div>
       <p class="empty chartEmpty" style="display:none">No entries yet.</p>
     </div>
+  </div>
+  <div class="card">
+    <h2>Scale trends</h2>
+    <p class="sub">Tap to show or hide. Each has its own scale.</p>
+    <div id="scaleFilter" class="chips"></div>
+    <div id="scaleCharts"></div>
+    <p class="empty" id="scaleEmpty" style="display:none">Tick one above to see its trend.</p>
   </div>
 
   <p class="foot">Made with love. Every entry is a little win. 💜</p>
@@ -338,6 +362,39 @@ function fmt(n,d=1){return (n==null||isNaN(n))?"—":Number(n).toFixed(d)}
 function dir(delta){ if(delta<=-0.1)return"down"; if(delta>=0.1)return"up"; return"same"; }
 function colFor(dir){ return dir==="down"?"#17b8a6":dir==="up"?"#f4a259":"#c9bce0"; }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+/* ---------- protein guide (lean-mass based, body fat smoothed) ---------- */
+function avgRecent(key,n){
+  const vals=DATA.map(r=>r[key]).filter(v=>v!=null).slice(-n);
+  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+function renderProtein(){
+  const host=$("proteinBody"); if(!host) return;
+  const latest=DATA[DATA.length-1]||{};
+  const weight=latest.weight;
+  const bf=avgRecent("bodyFat",3);
+  if(weight==null || bf==null){
+    host.innerHTML=`<div class="empty">Add a weight and a body fat % and a protein range will appear here.</div>`;
+    return;
+  }
+  const lean=weight*(1-bf/100);
+  const r5=x=>Math.round(x/5)*5;
+  const lo=r5(lean*1.6), hi=r5(lean*2.0);
+  host.innerHTML=`
+    <div class="p-range">
+      <div class="big">≈ ${lo}–${hi} g</div>
+      <div class="cap">protein per day</div>
+    </div>
+    <div class="pband">
+      <div class="h">${lo} g · lower end (1.6 g/kg lean)</div>
+      <div class="t">Enough to preserve muscle for someone moderately active in a gentle deficit. A sensible floor to stay around, not a line to panic about dropping a gram under.</div>
+    </div>
+    <div class="pband">
+      <div class="h">${hi} g · upper end (2.0 g/kg lean)</div>
+      <div class="t">The stronger muscle-protection end. Worth leaning towards on harder training days, with resistance work, or in a steeper deficit, where the extra protein helps hold lean tissue and keeps you fuller.</div>
+    </div>
+    <div class="p-basis">Worked out from about ${lean.toFixed(1)} kg of lean mass (${fmt(weight)} kg at ${fmt(bf)}% body fat, averaged over recent weeks so it doesn't jump around). Scaling to lean mass rather than total weight avoids counting fat tissue. A general guide, not a substitute for a dietitian.</div>`;
+}
 function dateParts(s){ const p=String(s||"").slice(0,10).split("-"); return p.length===3?p:null; }
 function shortDate(s){ const p=dateParts(s); return p?(+p[2])+"/"+(+p[1]):""; }        // 14/8
 function fullDate(s){ const p=dateParts(s); if(!p) return ""; 
@@ -378,22 +435,23 @@ function render(){
   // tiles
   const tiles=$("tiles"); tiles.innerHTML="";
   const prev=DATA[DATA.length-2]||{};
-  [["muscleMass","Muscle mass","kg",1,"up"],
-   ["visceralFat","Visceral fat","",0,"down"],
-   ["metabolicAge","Metabolic age","",0,"down"],
-   ["bodyShape","Body shape","",0,null],
-   ["boneMass","Bone mass","kg",1,null],
-   ["bmr","BMR","kcal",0,null]].forEach(([k,lab,unit,dec,goodDir])=>{
+  [["muscleMass","Muscle mass","kg",1,"up",false],
+   ["visceralFat","Visceral fat","",0,"down",false],
+   ["metabolicAge","Metabolic age","",0,"down",false],
+   ["bodyShape","Body shape","",0,null,false],
+   ["boneMass","Bone mass","kg",1,"up",true],
+   ["bmr","BMR","kcal",0,null,false]].forEach(([k,lab,unit,dec,goodDir,flagDrop])=>{
     const now=latest[k], was=prev[k];
-    let chg="";
+    let chg="", flag="";
     if(now!=null&&was!=null){
       const d=now-was;
       let c="var(--muted)";
       if(d!==0 && goodDir){ const good = goodDir==="down" ? d<0 : d>0; c = good?"var(--down)":"var(--up)"; }
+      if(flagDrop && d<0){ c="#d64545"; flag=`<div class="tile-flag">Dropped, keep an eye on this</div>`; }
       chg=`<div class="chg" style="color:${c}">${d>0?"+":""}${fmt(d,dec)} ${unit}</div>`;
     }
     tiles.innerHTML+=`<div class="tile"><div class="lab">${lab}</div>
-      <div class="val">${now==null?"—":fmt(now,dec)}<span style="font-size:.8rem;color:var(--muted)"> ${unit}</span></div>${chg}</div>`;
+      <div class="val">${now==null?"—":fmt(now,dec)}<span style="font-size:.8rem;color:var(--muted)"> ${unit}</span></div>${chg}${flag}</div>`;
   });
 
   // latest note
@@ -405,6 +463,9 @@ function render(){
 
   buildMeasChips();
   drawCharts();
+  buildScaleChips();
+  renderScaleCharts();
+  renderProtein();
 }
 
 /* ---------- charts ---------- */
@@ -477,6 +538,51 @@ function drawCharts(){
       {label:"Body water %",data:DATA.map(r=>r.bodyWater??null),borderColor:"#17b8a6",
        backgroundColor:"#17b8a622",borderWidth:2.5,tension:.35,pointRadius:3,spanGaps:true}]},
     options:baseOpts()});
+}
+
+/* ---------- scale-metric trend charts (one per metric, each self-scaling) ---------- */
+const SCALE_TREND = [
+  {k:"muscleMass",  c:"#17b8a6", label:"Muscle mass (kg)"},
+  {k:"visceralFat", c:"#f4a259", label:"Visceral fat"},
+  {k:"metabolicAge",c:"#a855f7", label:"Metabolic age"},
+  {k:"bodyShape",   c:"#6c8ae0", label:"Body shape"}
+];
+let selectedScale = new Set(SCALE_TREND.map(s=>s.k));   // all on by default
+let scaleCharts = {};
+
+function buildScaleChips(){
+  const host=$("scaleFilter"); if(!host || host.childElementCount) return;
+  SCALE_TREND.forEach(({k,c,label})=>{
+    const el=document.createElement("span");
+    el.className="chip"+(selectedScale.has(k)?"":" off");
+    el.innerHTML=`<span class="cdot" style="background:${c}"></span>${label}`;
+    el.addEventListener("click",()=>{
+      if(selectedScale.has(k)) selectedScale.delete(k); else selectedScale.add(k);
+      el.classList.toggle("off");
+      renderScaleCharts();
+    });
+    host.appendChild(el);
+  });
+}
+
+function renderScaleCharts(){
+  const host=$("scaleCharts"); if(!host) return;
+  Object.values(scaleCharts).forEach(c=>{try{c.destroy();}catch(e){}}); scaleCharts={};
+  host.innerHTML="";
+  const active = SCALE_TREND.filter(s=>selectedScale.has(s.k));
+  $("scaleEmpty").style.display = active.length ? "none" : "block";
+  if(DATA.length===0 || !window.Chart) return;
+  const labels=DATA.map(r=>shortDate(r.date));
+  active.forEach(({k,c,label})=>{
+    const wrap=document.createElement("div");
+    wrap.innerHTML=`<div class="mini-title">${label}</div><div class="chartbox mini"><canvas></canvas></div>`;
+    host.appendChild(wrap);
+    const opts=baseOpts(); opts.plugins.legend.display=false;
+    scaleCharts[k]=new Chart(wrap.querySelector("canvas"),{type:'line',
+      data:{labels,datasets:[{label,data:DATA.map(r=>r[k]??null),borderColor:c,
+        backgroundColor:c+'22',borderWidth:2.5,tension:.35,pointRadius:3,pointBackgroundColor:c,spanGaps:true}]},
+      options:opts});
+  });
 }
 
 /* ---------- data i/o ---------- */
